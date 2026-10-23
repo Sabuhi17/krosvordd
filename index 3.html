@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sosial texnologiyalar — Krossvord</title>
+<style>
+  :root {
+    --bg: #f5f3ee;
+    --surface: #ffffff;
+    --text: #1f2430;
+    --muted: #6b7280;
+    --border: #d9d5ca;
+    --accent: #1d5fd1;
+    --accent-soft: #dbe7fb;
+    --good: #1e8a4c;
+    --good-soft: #d9f2e3;
+    --bad: #c8312d;
+    --bad-soft: #fbe0de;
+    --cell-empty: #fbfaf7;
+    --block: transparent;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161b;
+      --surface: #1d2027;
+      --text: #eceef2;
+      --muted: #9aa1ae;
+      --border: #363b46;
+      --accent: #6ea0f5;
+      --accent-soft: #24365a;
+      --good: #4cc784;
+      --good-soft: #1b3a2a;
+      --bad: #ff7b76;
+      --bad-soft: #4a2220;
+      --cell-empty: #252932;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    line-height: 1.45;
+    padding: 16px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 14px; }
+  header h1 { font-size: clamp(1.3rem, 4vw, 1.9rem); margin: 0 0 4px; }
+  header p { margin: 0; color: var(--muted); font-size: .95rem; }
+
+  .status {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 10px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 10px 14px; margin-bottom: 14px;
+  }
+  .lives { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+  .heart { font-size: 1.5rem; transition: transform .2s, opacity .2s, filter .2s; }
+  .heart.lost { opacity: .25; filter: grayscale(1); transform: scale(.85); }
+  .counter { color: var(--muted); font-size: .9rem; }
+  button.btn {
+    background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+    padding: 8px 16px; font-size: .95rem; font-weight: 600; cursor: pointer;
+  }
+  button.btn:hover { filter: brightness(1.08); }
+
+  .layout { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  @media (min-width: 860px) { .layout { grid-template-columns: 1.5fr 1fr; align-items: start; } }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .card h2 { font-size: 1rem; margin: 0 0 10px; }
+
+  .board-scroll { overflow-x: auto; padding-bottom: 4px; }
+  .board { display: grid; margin: 0 auto; width: max-content; gap: 2px; }
+  .cell {
+    width: var(--cs, 30px); height: var(--cs, 30px);
+    position: relative; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: calc(var(--cs, 30px) * .52);
+    background: var(--cell-empty); border: 1px solid var(--border);
+    user-select: none; transition: background .2s;
+  }
+  .cell.block { background: var(--block); border-color: transparent; }
+  .cell .num {
+    position: absolute; top: 1px; left: 3px; font-size: calc(var(--cs, 30px) * .3);
+    font-weight: 600; color: var(--muted); line-height: 1;
+  }
+  .cell.found { background: var(--good-soft); border-color: var(--good); color: var(--good); }
+  .cell.hl { background: var(--accent-soft); border-color: var(--accent); }
+  .cell.found.hl { background: var(--good-soft); border-color: var(--accent); }
+  .cell.missed { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
+  .cell.pop { animation: pop .25s ease; }
+  @keyframes pop { 50% { transform: scale(1.15); } }
+
+  ol.clues { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  ol.clues li {
+    display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: .93rem;
+  }
+  ol.clues li:hover, ol.clues li.active { border-color: var(--accent); background: var(--accent-soft); }
+  ol.clues li .n {
+    flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: .8rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; margin-top: 1px;
+  }
+  ol.clues li .meta { display: block; color: var(--muted); font-size: .78rem; margin-top: 2px; }
+  ol.clues li.done { border-color: var(--good); background: var(--good-soft); }
+  ol.clues li.done .n { background: var(--good); }
+  ol.clues li.done .t { text-decoration: line-through; text-decoration-color: var(--good); }
+  ol.clues li.failed { border-color: var(--bad); background: var(--bad-soft); }
+  ol.clues li.failed .n { background: var(--bad); }
+
+  .keyboard { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .key {
+    min-width: 38px; height: 42px; padding: 0 8px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    font-size: 1rem; font-weight: 700; cursor: pointer;
+  }
+  .key:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+  .key.right { background: var(--good-soft); border-color: var(--good); color: var(--good); }
+  .key.wrong { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
+  .key:disabled { cursor: not-allowed; opacity: .75; }
+
+  .message {
+    margin-top: 14px; padding: 12px 14px; border-radius: 10px; text-align: center;
+    font-weight: 600; display: none;
+  }
+  .message.show { display: block; }
+  .message.win { background: var(--good-soft); color: var(--good); border: 1px solid var(--good); }
+  .message.lose { background: var(--bad-soft); color: var(--bad); border: 1px solid var(--bad); }
+  .message.info { background: var(--accent-soft); color: var(--text); border: 1px solid var(--accent); }
+  .current { margin-top: 14px; text-align: center; font-size: .95rem; min-height: 1.4em; }
+  .current b { color: var(--accent); }
+  .hint { color: var(--muted); font-size: .85rem; text-align: center; margin-top: 10px; }
+  footer { text-align: center; color: var(--muted); font-size: .8rem; margin-top: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Sosial siyasətdə sosial texnologiyalar</h1>
+    <p>Əsas anlayışlardan krossvord</p>
+  </header>
+
+  <div class="status">
+    <div class="lives" aria-live="polite">
+      <span>Cəhdlər:</span>
+      <span id="hearts"></span>
+    </div>
+    <div class="counter" id="counter"></div>
+    <button class="btn" id="restart" type="button">Yenidən başla</button>
+  </div>
+
+  <div class="layout">
+    <section class="card">
+      <h2>Krossvord</h2>
+      <div class="board-scroll"><div class="board" id="board" aria-label="Krossvord lövhəsi"></div></div>
+
+      <div class="current" id="current"></div>
+      <div class="keyboard" id="keyboard" aria-label="Hərf seçimi"></div>
+      <div class="message" id="message" role="status"></div>
+      <p class="hint">Əvvəlcə açar sözü (və ya krossvorddakı xananı) seçin, sonra hərf seçin. Hərf yalnız seçdiyiniz sözdə açılır. Seçdiyiniz sözdə olmayan hərf səhv sayılır: 3 səhvə icazə var, 4-cü səhvdə oyun başa çatır.</p>
+    </section>
+
+    <section class="card">
+      <h2>Açar sözlər</h2>
+      <ol class="clues" id="clues"></ol>
+    </section>
+  </div>
+
+  <footer>Fənn: Sosial siyasət · Mövzu: Sosial siyasətdə sosial texnologiyalar</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---- Krossvordun məlumatı (r = sətir, c = sütun, d: A = üfüqi, D = şaquli) ----
+  var WORDS = [
+    { n: 1, w: 'PROQNOZLAŞDIRMA', r: 5,  c: 1, d: 'A', clue: 'Sosial siyasətdə gələcəyi proqnozlaşdıran üsul' },
+    { n: 2, w: 'LAYİHƏLƏŞDİRMƏ',  r: 7,  c: 0, d: 'A', clue: 'Sosial problemlərin həlli üçün layihə hazırlığı' },
+    { n: 3, w: 'PLANLAŞDIRMA',    r: 0,  c: 9, d: 'D', clue: 'Sosial proseslərin məqsəd və göstəricilərlə idarəsi' },
+    { n: 4, w: 'EKSPERTİZA',      r: 9,  c: 4, d: 'A', clue: 'Sosial proseslərin qiymətləndirilməsi' },
+    { n: 5, w: 'DİAQNOSTİKA',     r: 3,  c: 5, d: 'A', clue: 'Sosial vəziyyətin təhlili və səbəblərin müəyyənləşdirilməsi' },
+    { n: 6, w: 'SOSİALSİYASƏT',   r: 11, c: 0, d: 'A', clue: 'Cəmiyyətin rifah səviyyəsini yüksəltmək məqsədi', note: '2 söz' },
+    { n: 7, w: 'TEXNOLOGİYA',     r: 1,  c: 4, d: 'A', clue: 'Sosial sabitlik və ədaləti təmin edən vasitə' }
+  ];
+
+  var ALPHABET = ['A','B','C','Ç','D','E','Ə','F','G','Ğ','H','X','I','İ','J','K','Q','L','M','N','O','Ö','P','R','S','Ş','T','U','Ü','V','Y','Z'];
+  var MAX_ALLOWED_MISTAKES = 3;      // 3 səhvə icazə var
+  var LOSE_AT = MAX_ALLOWED_MISTAKES + 1; // 4-cü səhvdə uduzur
+
+  // ---- Vəziyyət ----
+  var cells = {};      // "r,c" -> { ch, el, letterEl, words: [indexlər], filled }
+  var rows = 0, cols = 0;
+  var mistakes, over, activeWord, used; // used[wi][hərf] = 'right' | 'wrong'
+
+  var boardEl = document.getElementById('board');
+  var cluesEl = document.getElementById('clues');
+  var keyboardEl = document.getElementById('keyboard');
+  var heartsEl = document.getElementById('hearts');
+  var counterEl = document.getElementById('counter');
+  var messageEl = document.getElementById('message');
+  var currentEl = document.getElementById('current');
+  var keyEls = {};
+
+  function key(r, c) { return r + ',' + c; }
+
+  function wordCells(w) {
+    var list = [];
+    for (var i = 0; i < w.w.length; i++) {
+      list.push(w.d === 'A' ? key(w.r, w.c + i) : key(w.r + i, w.c));
+    }
+    return list;
+  }
+
+  function build() {
+    WORDS.forEach(function (w) {
+      var endR = w.d === 'D' ? w.r + w.w.length : w.r + 1;
+      var endC = w.d === 'A' ? w.c + w.w.length : w.c + 1;
+      rows = Math.max(rows, endR);
+      cols = Math.max(cols, endC);
+    });
+
+    WORDS.forEach(function (w, wi) {
+      wordCells(w).forEach(function (k, i) {
+        if (!cells[k]) cells[k] = { ch: w.w[i], words: [], el: null, num: null, filled: false };
+        cells[k].words.push(wi);
+      });
+      cells[key(w.r, w.c)].num = w.n;
+    });
+
+    boardEl.style.gridTemplateColumns = 'repeat(' + cols + ', var(--cs))';
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        var k = key(r, c);
+        var div = document.createElement('div');
+        if (cells[k]) {
+          div.className = 'cell';
+          if (cells[k].num) {
+            var s = document.createElement('span');
+            s.className = 'num';
+            s.textContent = cells[k].num;
+            div.appendChild(s);
+          }
+          var letter = document.createElement('span');
+          letter.className = 'letter';
+          div.appendChild(letter);
+          cells[k].el = div;
+          cells[k].letterEl = letter;
+          (function (cell) {
+            div.addEventListener('click', function () {
+              if (over) return;
+              // Kəsişən xanada təkrar kliklə istiqaməti dəyiş
+              var idx = cell.words.indexOf(activeWord);
+              var next = idx === -1 ? cell.words[0] : cell.words[(idx + 1) % cell.words.length];
+              setActive(next);
+            });
+          })(cells[k]);
+        } else {
+          div.className = 'cell block';
+        }
+        boardEl.appendChild(div);
+      }
+    }
+
+    WORDS.forEach(function (w, wi) {
+      var li = document.createElement('li');
+      var meta = (w.d === 'A' ? '→ üfüqi' : '↓ şaquli') + ' · ' + w.w.length + ' hərf' + (w.note ? ' (' + w.note + ')' : '');
+      li.innerHTML =
+        '<span class="n">' + w.n + '</span>' +
+        '<span><span class="t"></span><span class="meta"></span></span>';
+      li.querySelector('.t').textContent = w.clue;
+      li.querySelector('.meta').textContent = meta;
+      li.addEventListener('click', function () { if (!over) setActive(wi); });
+      cluesEl.appendChild(li);
+    });
+
+    ALPHABET.forEach(function (ch) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'key';
+      b.textContent = ch;
+      b.addEventListener('click', function () { guess(ch); });
+      keyboardEl.appendChild(b);
+      keyEls[ch] = b;
+    });
+
+    fitCells();
+  }
+
+  function fitCells() {
+    var host = boardEl.parentElement;
+    var avail = host.clientWidth || 320;
+    var size = Math.floor((avail - (cols - 1) * 2) / cols);
+    size = Math.max(22, Math.min(40, size));
+    boardEl.style.setProperty('--cs', size + 'px');
+  }
+
+  function isWordDone(wi) {
+    return wordCells(WORDS[wi]).every(function (k) { return cells[k].filled; });
+  }
+
+  function allSolved() {
+    return Object.keys(cells).every(function (k) { return cells[k].filled; });
+  }
+
+  function setActive(wi) {
+    activeWord = wi;
+    Object.keys(cells).forEach(function (k) { cells[k].el.classList.remove('hl'); });
+    if (wi != null) {
+      wordCells(WORDS[wi]).forEach(function (k) { cells[k].el.classList.add('hl'); });
+    }
+    Array.prototype.forEach.call(cluesEl.children, function (li, i) {
+      li.classList.toggle('active', i === wi);
+    });
+    if (messageEl.classList.contains('info')) {
+      messageEl.className = 'message';
+      messageEl.textContent = '';
+    }
+    updateCurrent();
+    updateKeyboard();
+  }
+
+  function updateCurrent() {
+    if (over) { currentEl.textContent = ''; return; }
+    if (activeWord == null) {
+      currentEl.textContent = 'Söz seçilməyib';
+      return;
+    }
+    var w = WORDS[activeWord];
+    var dir = w.d === 'A' ? '→ üfüqi' : '↓ şaquli';
+    currentEl.innerHTML = 'Seçilmiş söz: <b>' + w.n + ' ' + dir + '</b> (' + w.w.length + ' hərf)' +
+      (isWordDone(activeWord) ? ' — tamamlanıb ✓' : '');
+  }
+
+  // Klaviatura seçilmiş sözün vəziyyətini göstərir
+  function updateKeyboard() {
+    var u = activeWord != null ? used[activeWord] : {};
+    var locked = over || activeWord == null || (activeWord != null && isWordDone(activeWord));
+    ALPHABET.forEach(function (ch) {
+      var b = keyEls[ch];
+      b.className = 'key' + (u[ch] === 'right' ? ' right' : u[ch] === 'wrong' ? ' wrong' : '');
+      b.disabled = over || (activeWord != null && (locked || !!u[ch]));
+    });
+  }
+
+  function renderHearts() {
+    heartsEl.innerHTML = '';
+    for (var i = 0; i < MAX_ALLOWED_MISTAKES; i++) {
+      var h = document.createElement('span');
+      h.className = 'heart' + (i < mistakes ? ' lost' : '');
+      h.textContent = '❤️';
+      h.setAttribute('aria-hidden', 'true');
+      heartsEl.appendChild(h);
+    }
+    var left = Math.max(0, MAX_ALLOWED_MISTAKES - mistakes);
+    counterEl.textContent = 'Səhv: ' + Math.min(mistakes, LOSE_AT) + ' · Qalan icazə: ' + left;
+  }
+
+  function refresh(wi, letter) {
+    Object.keys(cells).forEach(function (k) {
+      var cell = cells[k];
+      cell.letterEl.textContent = cell.filled ? cell.ch : '';
+      cell.el.classList.toggle('found', cell.filled);
+    });
+    if (wi != null && letter) {
+      wordCells(WORDS[wi]).forEach(function (k) {
+        var cell = cells[k];
+        if (cell.ch === letter) {
+          cell.el.classList.remove('pop');
+          void cell.el.offsetWidth;
+          cell.el.classList.add('pop');
+        }
+      });
+    }
+    Array.prototype.forEach.call(cluesEl.children, function (li, i) {
+      li.classList.toggle('done', isWordDone(i));
+    });
+  }
+
+  function showMessage(type, text) {
+    messageEl.className = 'message show ' + type;
+    messageEl.textContent = text;
+  }
+
+  function guess(ch) {
+    if (over) return;
+    if (activeWord == null) {
+      showMessage('info', 'Əvvəlcə açar sözlərdən birini (və ya krossvorddakı xananı) seçin.');
+      return;
+    }
+    var wi = activeWord;
+    if (isWordDone(wi) || used[wi][ch]) return;
+
+    var keys = wordCells(WORDS[wi]);
+    var hit = false;
+    keys.forEach(function (k) {
+      if (cells[k].ch === ch) { cells[k].filled = true; hit = true; }
+    });
+
+    if (hit) {
+      used[wi][ch] = 'right';
+      refresh(wi, ch);
+      updateCurrent();
+      updateKeyboard();
+      if (allSolved()) {
+        over = true;
+        updateKeyboard();
+        updateCurrent();
+        showMessage('win', '🎉 Təbrik edirik! Krossvordu həll etdiniz. Səhv sayı: ' + mistakes);
+      }
+    } else {
+      used[wi][ch] = 'wrong';
+      mistakes++;
+      renderHearts();
+      if (mistakes >= LOSE_AT) {
+        over = true;
+        Object.keys(cells).forEach(function (k) {
+          var cell = cells[k];
+          if (!cell.filled) {
+            cell.letterEl.textContent = cell.ch;
+            cell.el.classList.add('missed');
+          }
+        });
+        Array.prototype.forEach.call(cluesEl.children, function (li, i) {
+          if (!isWordDone(i)) li.classList.add('failed');
+        });
+        updateKeyboard();
+        updateCurrent();
+        showMessage('lose', '😔 Uduzdunuz — 4-cü dəfə səhv hərf seçdiniz. Qırmızı hərflər açılmamış cavablardır. Yenidən cəhd edin!');
+      } else {
+        updateKeyboard();
+      }
+    }
+  }
+
+  function reset() {
+    used = WORDS.map(function () { return {}; });
+    mistakes = 0;
+    over = false;
+    activeWord = null;
+    messageEl.className = 'message';
+    messageEl.textContent = '';
+    Object.keys(cells).forEach(function (k) {
+      cells[k].filled = false;
+      cells[k].el.classList.remove('missed', 'found', 'pop', 'hl');
+      cells[k].letterEl.textContent = '';
+    });
+    Array.prototype.forEach.call(cluesEl.children, function (li) {
+      li.classList.remove('done', 'failed', 'active');
+    });
+    renderHearts();
+    updateCurrent();
+    updateKeyboard();
+  }
+
+  // Fiziki klaviatura dəstəyi (Azərbaycan hərfləri üçün 'az' locale)
+  document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (!e.key || e.key.length !== 1) return;
+    var ch = e.key.toLocaleUpperCase('az');
+    if (keyEls[ch]) guess(ch);
+  });
+
+  document.getElementById('restart').addEventListener('click', reset);
+  window.addEventListener('resize', fitCells);
+
+  build();
+  reset();
+})();
+</script>
+</body>
+</html>
